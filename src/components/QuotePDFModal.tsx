@@ -31,25 +31,18 @@ export function QuotePDFModal({ quoteId, onClose }: Props) {
 
   const handleWhatsApp = useCallback(() => {
     if (!quote || !customer) return
-    setDesktopHint(false)
 
+    const cleaned = customer.phone.replace(/\D/g, '')
+    const withoutLeadingZero = cleaned.startsWith('0') ? cleaned.slice(1) : cleaned
+    const waUrl = `https://wa.me/972${withoutLeadingZero}`
+
+    // Open WhatsApp FIRST — directly from click event, before anything else
+    window.open(waUrl, '_blank')
+
+    // Then download the PDF if blob is ready
     const blob = blobRef.current
-    const fileName = `${quote.quoteNumber}_ICEZ.pdf`
-
-    // Mobile: native file-share (still needs async, but canShare check is sync)
-    if (blob && navigator.canShare?.({ files: [new File([blob], fileName, { type: 'application/pdf' })] })) {
-      const file = new File([blob], fileName, { type: 'application/pdf' })
-      navigator.share({ files: [file] }).catch(() => {})
-      return
-    }
-
-    // Desktop: everything synchronous from here
-    const digits = customer.phone.replace(/\D/g, '')
-    const intlPhone = digits.startsWith('0') ? '972' + digits.slice(1) : digits
-    const waUrl = intlPhone ? `https://wa.me/${intlPhone}` : 'https://wa.me'
-
-    // Download PDF if blob is ready
     if (blob) {
+      const fileName = `${quote.quoteNumber}_ICEZ.pdf`
       const blobUrl = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = blobUrl
@@ -58,9 +51,6 @@ export function QuotePDFModal({ quoteId, onClose }: Props) {
       setTimeout(() => URL.revokeObjectURL(blobUrl), 1000)
       setDesktopHint(true)
     }
-
-    // Open WhatsApp — synchronous, no async before this
-    window.open(waUrl, '_blank')
   }, [quote, customer])
 
   if (!quote || !customer) return null
