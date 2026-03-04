@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { PDFViewer, PDFDownloadLink, pdf } from '@react-pdf/renderer'
 import { X, Download, MessageCircle, Loader2, FileText, Info } from 'lucide-react'
 import { QuotePDFDocument } from './QuotePDF'
@@ -10,62 +10,58 @@ interface Props {
 }
 
 export function QuotePDFModal({ quoteId, onClose }: Props) {
-  const { quotes, customers, addToast } = useCRMStore()
+  const { quotes, customers } = useCRMStore()
   const quote = quotes.find((q) => q.id === quoteId)
   const customer = customers.find((c) => c.id === quote?.customerId)
 
-  const [whatsappLoading, setWhatsappLoading] = useState(false)
   const [desktopHint, setDesktopHint] = useState(false)
+  // Pre-generate PDF blob in the background as soon as the modal opens
+  const blobRef = useRef<Blob | null>(null)
+  const [blobReady, setBlobReady] = useState(false)
 
-  const handleWhatsApp = useCallback(async () => {
+  useEffect(() => {
     if (!quote || !customer) return
-    setWhatsappLoading(true)
+    let cancelled = false
+    const doc = <QuotePDFDocument quote={quote} customer={customer} />
+    pdf(doc).toBlob().then((blob) => {
+      if (!cancelled) { blobRef.current = blob; setBlobReady(true) }
+    }).catch(() => {})
+    return () => { cancelled = true }
+  }, [quote?.id, customer?.id])
+
+  const handleWhatsApp = useCallback(() => {
+    if (!quote || !customer) return
     setDesktopHint(false)
 
-    // Open a blank window SYNCHRONOUSLY (before any await) so the browser
-    // doesn't treat it as a popup. We'll navigate it after PDF is ready.
-    const waWin = window.open('about:blank', '_blank')
+    const blob = blobRef.current
+    const fileName = `${quote.quoteNumber}_ICEZ.pdf`
 
-    try {
-      const doc = <QuotePDFDocument quote={quote} customer={customer} />
-      const blob = await pdf(doc).toBlob()
-      const file = new File([blob], `${quote.quoteNumber}_ICEZ.pdf`, { type: 'application/pdf' })
+    // Mobile: native file-share (still needs async, but canShare check is sync)
+    if (blob && navigator.canShare?.({ files: [new File([blob], fileName, { type: 'application/pdf' })] })) {
+      const file = new File([blob], fileName, { type: 'application/pdf' })
+      navigator.share({ files: [file] }).catch(() => {})
+      return
+    }
 
-      // Mobile: native file-share sheet
-      if (navigator.canShare?.({ files: [file] })) {
-        waWin?.close()
-        await navigator.share({ files: [file] })
-        return
-      }
+    // Desktop: everything synchronous from here
+    const digits = customer.phone.replace(/\D/g, '')
+    const intlPhone = digits.startsWith('0') ? '972' + digits.slice(1) : digits
+    const waUrl = intlPhone ? `https://wa.me/${intlPhone}` : 'https://wa.me'
 
-      // Desktop:
-      // 1. Download the PDF
+    // Download PDF if blob is ready
+    if (blob) {
       const blobUrl = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = blobUrl
-      a.download = `${quote.quoteNumber}_ICEZ.pdf`
+      a.download = fileName
       a.click()
-      URL.revokeObjectURL(blobUrl)
-
-      // 2. Navigate the pre-opened window to WhatsApp Web
-      const digits = customer.phone.replace(/\D/g, '')
-      const intlPhone = digits.startsWith('0') ? '972' + digits.slice(1) : digits
-      const waUrl = intlPhone
-        ? `https://web.whatsapp.com/send?phone=${intlPhone}`
-        : 'https://web.whatsapp.com/'
-      if (waWin) {
-        waWin.location.href = waUrl
-      } else {
-        window.open(waUrl, '_blank')
-      }
-
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 1000)
       setDesktopHint(true)
-    } catch {
-      waWin?.close()
-    } finally {
-      setWhatsappLoading(false)
     }
-  }, [quote, customer, addToast])
+
+    // Open WhatsApp — synchronous, no async before this
+    window.open(waUrl, '_blank')
+  }, [quote, customer])
 
   if (!quote || !customer) return null
 
@@ -89,10 +85,9 @@ export function QuotePDFModal({ quoteId, onClose }: Props) {
           {/* WhatsApp */}
           <button
             onClick={handleWhatsApp}
-            disabled={whatsappLoading}
-            className="flex items-center gap-2 bg-[#25D366] hover:bg-[#1ebe5b] disabled:opacity-60 text-white px-4 py-2 rounded-xl text-sm font-medium transition-colors cursor-pointer"
+            className="flex items-center gap-2 bg-[#25D366] hover:bg-[#1ebe5b] text-white px-4 py-2 rounded-xl text-sm font-medium transition-colors cursor-pointer"
           >
-            {whatsappLoading
+            {!blobReady
               ? <Loader2 size={16} className="animate-spin" />
               : <MessageCircle size={16} />
             }
