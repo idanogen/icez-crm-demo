@@ -34,7 +34,8 @@ export function QuotePDFModal({ quoteId, onClose }: Props) {
 
     const cleaned = customer.phone.replace(/\D/g, '')
     const withoutLeadingZero = cleaned.startsWith('0') ? cleaned.slice(1) : cleaned
-    const waUrl = `https://wa.me/972${withoutLeadingZero}`
+    const message = `שלום ${customer.name},\nמצורפת הצעת המחיר ${quote.quoteNumber} מ-ICEZ בסך ₪${quote.totalAmount.toLocaleString('he-IL')}.\nלשאלות ופרטים נוספים אנחנו כאן!`
+    const waUrl = `https://wa.me/972${withoutLeadingZero}?text=${encodeURIComponent(message)}`
 
     // Open WhatsApp FIRST — directly from click event, before anything else
     window.open(waUrl, '_blank')
@@ -116,17 +117,17 @@ export function QuotePDFModal({ quoteId, onClose }: Props) {
 
       {/* Desktop attach hint — shown after download+WhatsApp open */}
       {desktopHint && (
-        <div className="bg-amber-50 border-b border-amber-200 px-5 py-3 flex items-center gap-3 shrink-0">
-          <Info size={16} className="text-amber-600 shrink-0" />
-          <p className="text-sm text-amber-800">
-            <strong>הקובץ הורד למחשב.</strong>{' '}
-            בחלון הווטסאפ שנפתח — לחץ על{' '}
-            <span className="font-semibold">📎 צרף קובץ</span>{' '}
-            ובחר את הקובץ שהורד.
-          </p>
+        <div className="bg-amber-50 border-b border-amber-200 px-5 py-3 flex items-start gap-3 shrink-0">
+          <Info size={16} className="text-amber-600 shrink-0 mt-0.5" />
+          <div className="text-sm text-amber-800 flex-1">
+            <strong>הקובץ הורד + ווטסאפ נפתח עם הודעה מוכנה.</strong>
+            <span className="block mt-0.5 text-amber-700">
+              בחלון הווטסאפ: לחץ על <strong>📎</strong> ← <strong>בחר קובץ</strong> ← בחר את ה-PDF שהורד ← שלח.
+            </span>
+          </div>
           <button
             onClick={() => setDesktopHint(false)}
-            className="mr-auto text-amber-500 hover:text-amber-700 cursor-pointer shrink-0"
+            className="text-amber-500 hover:text-amber-700 cursor-pointer shrink-0"
             aria-label="סגור"
           >
             <X size={14} />
