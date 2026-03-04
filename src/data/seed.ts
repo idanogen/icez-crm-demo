@@ -28,7 +28,7 @@ export const seedCustomers: Customer[] = [
   {
     id: 'c3',
     name: 'רחל לוי',
-    phone: '054-1122334',
+    phone: '052-3694547',
     email: 'rachel.levi@walla.com',
     source: 'whatsapp',
     type: 'private',
